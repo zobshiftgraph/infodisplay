@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Staff Management Controller</title>
+    <style>
+        body { font-family: sans-serif; background: #111; color: #eee; padding: 20px; }
+        .control-panel { background: #222; padding: 20px; border-radius: 10px; border: 1px solid #444; max-width: 500px; margin: 0 auto; }
+        h3 { margin-top: 0; color: #28a745; }
+        .control-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        label { font-weight: bold; font-size: 0.9rem; color: #bbb; }
+        select { padding: 12px; background: #333; color: #fff; border: 1px solid #555; border-radius: 5px; font-size: 1rem; cursor: pointer; }
+        select:focus { outline: none; border-color: #60a5fa; }
+        .status-msg { font-size: 0.8rem; margin-top: 10px; color: #60a5fa; opacity: 0; transition: opacity 0.3s; }
+    </style>
+</head>
+<body>
+
+<div class="control-panel">
+    <h3>Animation Controls</h3>
+    <div class="control-group">
+        <label for="animationSelect">Screen Completion Effect:</label>
+        <select id="animationSelect" onchange="updateAnimation(this.value)">
+            <option value="Particles">Particle Burst</option>
+            <option value="Confetti">Confetti Pop</option>
+            <option value="Pop">Initial Pop</option>
+            <option value="Slide">Slide Out</option>
+            <option value="Glitch">Cyber Glitch</option>
+            <option value="Ghost">Ghost Ascent</option>
+            <option value="Sparkle">Sparkle Shine</option>
+            <option value="Zoom">Zoom Fade</option>
+            <option value="None">None (Instant)</option>
+        </select>
+    </div>
+    <div id="statusMsg" class="status-msg">Settings synced to display...</div>
+</div>
+
+<script>
+    const API_URL = "https://staff-api.zobinfodisp.workers.dev/";
+
+    async function updateAnimation(val) {
+        const msg = document.getElementById('statusMsg');
+        try {
+            const res = await fetch(API_URL);
+            const data = await res.json();
+            data.currentAnimation = val;
+            await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data)
+            });
+            msg.style.opacity = "1";
+            setTimeout(() => msg.style.opacity = "0", 2000);
+        } catch (e) {
+            console.error("Update failed", e);
+        }
+    }
+
+    async function syncUI() {
+        try {
+            const res = await fetch(API_URL);
+            const data = await res.json();
+            if (data.currentAnimation) {
+                document.getElementById('animationSelect').value = data.currentAnimation;
+            }
+        } catch (e) {
+            console.error("Sync failed", e);
+        }
+    }
+    syncUI();
+</script>
+</body>
+</html>

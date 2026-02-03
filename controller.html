@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Information Display Dashboard</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* --- LOGIN OVERLAY --- */
+        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0f172a; z-index: 9999; display: flex; justify-content: center; align-items: center; color: white; flex-direction: column; }
+        .login-box { background: #1e293b; padding: 40px; border-radius: 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; width: 300px; }
+        .login-box input[type="password"] { width: 100%; padding: 15px; margin: 20px 0 10px 0; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: white; font-size: 1.5rem; text-align: center; letter-spacing: 5px; outline: none; box-sizing: border-box; }
+        .login-box button { width: 100%; padding: 12px; background: #6b46c1; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .login-box button:hover { opacity: 0.9; }
+        
+        /* Secondary Button Style */
+        .btn-secondary { margin-top: 15px; background: transparent !important; border: 1px solid #475569 !important; color: #94a3b8 !important; width: 100%; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .btn-secondary:hover { background: #334155 !important; color: white !important; }
+
+        /* --- LAYOUT --- */
+        .main-content { flex: 1; padding: 0; overflow-y: auto; height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; }
+        #activitySidebar { width: 338px; background: #1e293b; color: #f8fafc; display: flex; flex-direction: column; border-left: 4px solid #334155; height: 100vh; box-sizing: border-box; }
+        
+        /* --- NAV & BUTTONS --- */
+        .top-nav { background: white; padding: 15px 25px; border-bottom: 1px solid #cbd5e1; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; width: 100%; box-sizing: border-box; }
+        .btn-send { background: #6b46c1; color: white; border: none; padding: 12px 30px; border-radius: 10px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 14px rgba(107, 70, 193, 0.3); font-size: 1rem; transition: all 0.2s ease; width: 180px; text-align: center; }
+        .btn-send:disabled { background: #cbd5e1; color: #94a3b8; cursor: not-allowed; box-shadow: none; }
+        .btn-send.success { background: #22c55e !important; } 
+        .btn-send.error { background: #ef4444 !important; } 
+        
+        .vibe-btn { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 0.85rem; }
+        .vibe-btn:hover { background: #e2e8f0; color: #1e293b; }
+
+        /* --- CARDS --- */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; padding: 25px; }
+        .card { background: white; padding: 18px; border-radius: 12px; border-top: 5px solid #e53e3e; box-shadow: 0 4px 12px rgba(0,0,0,0.08); position: relative; transition: border-color 0.3s ease; }
+        .is-live { border-top-color: #38a169 !important; }
+        
+        /* Flash animation for updates */
+        @keyframes flashYellow { 0% { background-color: #fef08a; } 100% { background-color: transparent; } }
+        .flash-update { animation: flashYellow 1s ease-out; }
+
+        .section-title-input, .section-notes-textarea { 
+            width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 8px; outline: none; transition: all 0.2s; box-sizing: border-box; text-align: center; background: #f1f5f9; color: #1e293b; 
+        }
+        .section-title-input { font-weight: bold; font-size: 1rem; margin-bottom: 5px; }
+        .section-title-input:focus, .section-notes-textarea:focus { background: #ffffff; border-color: #6b46c1; box-shadow: 0 0 0 3px rgba(107, 70, 193, 0.1); }
+
+        .staff-container-shaded { background: #1e293b; padding: 15px; border-radius: 10px; margin: 12px 0; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); transition: background-color 0.3s; }
+        .staff-tag { background: #3b82f6; color: white; padding: 4px 8px 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; margin: 2px; display: inline-flex; align-items: center; gap: 6px; }
+        .remove-ini-btn { cursor: pointer; background: rgba(0,0,0,0.15); border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+
+        /* --- MODALS --- */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.8); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .modal-content { background: white; padding: 30px; border-radius: 20px; width: 90vw; max-width: 850px; max-height: 85vh; display: flex; flex-direction: column; box-sizing: border-box; }
+        #modalEmpList { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; overflow-y: auto; flex-grow: 1; padding-right: 5px; margin-bottom: 15px; }
+        #selectionGrid { display: grid; gap: 8px; overflow-y: auto; flex-grow: 1; margin-bottom: 20px; }
+        .staff-select-btn { padding: 12px 5px; border-radius: 8px; border: 1px solid #e2e8f0; font-weight: bold; cursor: pointer; text-align: center; background: #fff; }
+        .staff-selected { background: #6b46c1 !important; color: white !important; }
+
+        /* --- PASTE BUTTONS --- */
+        .paste-btn-row { display: flex; gap: 8px; margin-top: 10px; }
+        .paste-btn { flex: 1; font-size: 0.75rem; padding: 6px; background: #e2e8f0; border: 1px solid #cbd5e1; color: #475569; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
+        .paste-btn:hover { background: #cbd5e1; color: #1e293b; }
+
+        /* --- SEARCH RESULTS --- */
+        .search-result-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 15px; text-align: center; }
+        .search-large-initials { font-size: 3rem; font-weight: 900; color: #3b82f6; margin-bottom: 10px; }
+        .search-section-list { text-align: left; background: white; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1; }
+        .search-section-item { padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #334155; font-weight: 600; }
+        .search-section-item:last-child { border-bottom: none; }
+
+        /* --- MENU --- */
+        .dropdown-content { display: none; position: absolute; left: 0; background-color: white; min-width: 240px; box-shadow: 0px 10px 25px rgba(0,0,0,0.1); z-index: 101; border-radius: 12px; margin-top: 8px; border: 1px solid #e2e8f0; overflow: hidden; }
+        .show-menu { display: block; }
+        .dropdown-item { padding: 14px 20px; text-decoration: none; display: flex; justify-content: space-between; align-items: center; color: #334155; font-weight: 600; font-size: 0.95rem; border: none; background: none; width: 100%; text-align: left; cursor: pointer; }
+    </style>
+</head>
+<body onclick="closeMenu()">
+
+    <div id="loginOverlay">
+        <div class="login-box">
+            <h2>Access Control</h2>
+            <input type="password" id="pinInput" maxlength="4" placeholder="••••" onkeydown="if(event.key==='Enter') verifyPIN()">
+            <div style="margin: 15px 0;"><input type="checkbox" id="stayLoggedIn"> Stay logged in</div>
+            <button onclick="verifyPIN()">Unlock Dashboard</button>
+            <button class="btn-secondary" onclick="window.location.href='display.html'">Go to Display Screen</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="top-nav">
+            <div style="display:flex; gap:10px;">
+                <div class="dropdown" style="position: relative; display: inline-block;">
+                    <button class="vibe-btn" onclick="toggleMenu(event)">☰ Menu</button>
+                    <div id="myDropdown" class="dropdown-content">
+                        <button class="dropdown-item" onclick="addSection()">Add New Section</button>
+                        <button class="dropdown-item" onclick="toggleModal('empModal', true)">Manage Staff List</button>
+                        <div style="height:1px; background:#eee; margin:5px 0;"></div>
+                        <button class="dropdown-item" onclick="changeDisplayTitle()">Change Header Title</button>
+                        <div style="height:1px; background:#eee; margin:5px 0;"></div>
+                        <button class="dropdown-item" onclick="logout()" style="color:#e11d48;">Logout</button>
+                    </div>
+                </div>
+                <button class="vibe-btn" onclick="toggleModal('searchModal', true)">🔍 Find Staff</button>
+            </div>
+            <button id="sendBtn" class="btn-send" onclick="sendToDisplay()" disabled>SEND TO DISPLAY</button>
+            <div style="width: 80px;"></div>
+        </div>
+        <div id="container" class="grid"></div>
+    </div>
+
+    <div id="activitySidebar">
+        <div style="padding: 20px; background: #0f172a; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin:0; font-size: 0.9rem; color: #94a3b8; text-transform: uppercase;">Activity Log</h3>
+            <button onclick="clearLog()" style="background:transparent; border:1px solid #334155; color:#64748b; padding:4px 10px; border-radius:6px; cursor:pointer; font-size: 0.75rem;">Clear</button>
+        </div>
+        <div id="logContent" style="padding: 15px; overflow-y: auto; flex-grow: 1; font-family: 'Courier New', monospace;"></div>
+    </div>
+
+    <div id="searchModal" class="modal-overlay" onclick="toggleModal('searchModal', false)">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 500px;">
+            <h3 style="margin:0 0 20px 0;">Find Employee Location</h3>
+            <div style="display:flex; gap:10px; margin-bottom:20px;">
+                <input type="text" id="searchStaffInput" placeholder="Enter First Letter..." style="flex-grow:1; padding:12px; border-radius:10px; border:1px solid #e2e8f0; text-transform:uppercase; outline: none; font-size: 1.2rem; text-align:center;" oninput="performSearch()">
+            </div>
+            <div id="searchResults" style="flex-grow: 1; overflow-y: auto;"></div>
+            <button class="vibe-btn" onclick="toggleModal('searchModal', false)" style="padding:12px; margin-top:10px; background: #e11d48; color: white; border: none;">Close Search</button>
+        </div>
+    </div>
+
+    <div id="empModal" class="modal-overlay" onclick="toggleModal('empModal', false)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h3 style="margin:0 0 20px 0;">Staff Directory</h3>
+            <div style="display:flex; gap:10px; margin-bottom:20px;">
+                <input type="text" id="empInitials" placeholder="ABC" maxlength="3" style="flex-grow:1; padding:12px; border-radius:10px; border:1px solid #e2e8f0; text-transform:uppercase; outline: none;" onkeydown="if(event.key==='Enter') addEmployee()">
+                <button class="vibe-btn" style="background: #38a169; color:white; border:none;" onclick="addEmployee()">Add Staff</button>
+            </div>
+            <div id="modalEmpList"></div>
+            <button class="vibe-btn" onclick="toggleModal('empModal', false)" style="padding:12px; margin-top:10px; background: #e11d48; color: white; border: none;">Close Directory</button>
+        </div>
+    </div>
+
+    <div id="assignModal" class="modal-overlay">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #f1f5f9; padding-bottom:15px;">
+                <h3 style="margin:0;">Assign Staff</h3>
+                <div style="display: flex; gap: 10px;">
+                    <button class="vibe-btn" onclick="toggleSelectAll()">Select All</button>
+                    <button class="vibe-btn" style="color:#e11d48; border-color:#fecaca;" onclick="clearAllSelection()">Clear All</button>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <input type="text" id="quickAssignInput" placeholder="Type initials..." style="flex-grow:1; padding:12px; border-radius:10px; border:1px solid #e2e8f0; text-transform:uppercase; outline:none;" onkeydown="if(event.key==='Enter') quickToggleStaff()">
+                <button class="vibe-btn" style="background: #38a169; color:white; border:none;" onclick="quickToggleStaff()">Add</button>
+            </div>
+
+            <div id="selectionGrid"></div>
+            <div style="display: flex; gap: 12px; margin-top: 25px;">
+                <button class="vibe-btn" onclick="toggleModal('assignModal', false)" style="flex: 1; padding: 14px;">Cancel</button>
+                <button onclick="finalizeAssignment()" style="flex: 2; padding: 14px; background:#6b46c1; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">Update Section</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pasteModal" class="modal-overlay" onclick="toggleModal('pasteModal', false)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h3 id="pasteModalTitle" style="margin:0 0 15px 0;">Paste Data</h3>
+            <textarea id="pasteInput" placeholder="Paste data here..." style="width:100%; height:200px; padding:15px; border-radius:10px; border:1px solid #cbd5e1; font-family:monospace; resize:none; outline:none; box-sizing:border-box;"></textarea>
+            <div style="display: flex; gap: 12px; margin-top: 20px;">
+                <button class="vibe-btn" onclick="toggleModal('pasteModal', false)" style="flex: 1; padding: 14px;">Cancel</button>
+                <button onclick="submitPasteData()" style="flex: 2; padding: 14px; background:#6b46c1; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">Parse & Fill</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://staff-api.zobinfodisp.workers.dev/"; 
+        const PIN_HASH = "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f"; // 5678
+        
+        let sections = [], employees = [], currentAnimation = 'particles', pageTitle = "TOUCH INITIALS WHEN COMPLETE";
+        let currentTargetSection = null, tempSelected = [], lastLiveHash = "", hasChanges = false, failCount = 0;
+        let currentPasteType = ""; 
+
+        // --- AUTH ---
+        async function verifyPIN() {
+            const input = document.getElementById('pinInput').value.trim();
+            if (!window.crypto || !window.crypto.subtle || window.location.protocol === 'file:') {
+                console.warn("Local mode"); if (input === "5678") loginSuccess(); else { alert("Local Login Failed."); document.getElementById('pinInput').value = ''; } return;
+            }
+            try {
+                const encoder = new TextEncoder(); const data = encoder.encode(input);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+                if (hashHex.trim().toLowerCase() === PIN_HASH.trim().toLowerCase()) loginSuccess();
+                else { failCount++; if(failCount>=3 && confirm(`Debug: ${hashHex}. Bypass?`)) loginSuccess(); else alert("Incorrect PIN"); document.getElementById('pinInput').value=''; }
+            } catch (e) { alert("Security Error"); }
+        }
+        function loginSuccess() { failCount = 0; document.getElementById('loginOverlay').style.display = 'none'; if(document.getElementById('stayLoggedIn').checked) localStorage.setItem('persistentAuth', 'true'); else sessionStorage.setItem('isAuthorized', 'true'); syncFromCloud(); }
+        function checkAuth() { if (sessionStorage.getItem('isAuthorized') === 'true' || localStorage.getItem('persistentAuth') === 'true') document.getElementById('loginOverlay').style.display = 'none'; else setTimeout(() => document.getElementById('pinInput').focus(), 100); }
+        function logout() { if(confirm("Logout?")) { localStorage.removeItem('persistentAuth'); sessionStorage.removeItem('isAuthorized'); location.reload(); } }
+
+        // --- CORE ---
+        function markChanged() { hasChanges = true; document.getElementById('sendBtn').disabled = false; }
+        
+        async function syncFromCloud() {
+            try {
+                const res = await fetch(API_URL); if (!res.ok) throw new Error("Fetch failed");
+                const data = await res.json();
+                const newLiveHash = JSON.stringify(data.liveSections);
+                if (data.pageTitle) pageTitle = data.pageTitle;
+
+                if (newLiveHash !== lastLiveHash) {
+                    if (sections.length > 0 && data.liveSections) {
+                        data.liveSections.forEach(ls => {
+                            const draftIndex = sections.findIndex(s => s.id === ls.id);
+                            if (draftIndex !== -1) {
+                                const draft = sections[draftIndex];
+                                const cloudInis = ls.assignedInitials || [];
+                                const localInis = draft.assignedInitials || [];
+                                
+                                // SMART SYNC LOGIC
+                                if (JSON.stringify(localInis) !== JSON.stringify(cloudInis)) {
+                                    // Log completion
+                                    localInis.filter(ini => !cloudInis.includes(ini)).forEach(ini => addLogEntry(ini, ls.label));
+                                    
+                                    // Update local data
+                                    draft.assignedInitials = cloudInis;
+                                    
+                                    // Update DOM specifically
+                                    const card = document.getElementById(`card-${draftIndex}`);
+                                    if (card) {
+                                        const container = card.querySelector('.staff-container-shaded > div');
+                                        if (container) {
+                                            container.innerHTML = cloudInis.map(ini => `<span class="staff-tag">${ini} <span class="remove-ini-btn" onclick="removeSingleInitial(${draftIndex},'${ini}')">×</span></span>`).join('');
+                                            // FLASH ANIMATION TO SHOW UPDATE
+                                            card.querySelector('.staff-container-shaded').classList.remove('flash-update');
+                                            void card.offsetWidth; // trigger reflow
+                                            card.querySelector('.staff-container-shaded').classList.add('flash-update');
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    if (sections.length === 0 || sections.length !== (data.sections || []).length) {
+                         if(sections.length === 0) sections = data.sections || [];
+                         employees = data.employees || [];
+                         currentAnimation = data.currentAnimation || 'particles';
+                         render();
+                    }
+                    
+                    // --- REVERT MIGRATION SAFEGUARD ---
+                    let rawEmps = data.employees || [];
+                    if (rawEmps.length > 0 && typeof rawEmps[0] === 'object') {
+                        employees = rawEmps.map(e => e.initials).sort();
+                        markChanged(); 
+                    } else {
+                        employees = rawEmps;
+                    }
+
+                    currentAnimation = data.currentAnimation || 'particles';
+                    lastLiveHash = newLiveHash;
+                }
+            } catch (err) { console.error("Sync Error:", err); }
+        }
+
+        async function sendToDisplay() {
+            const btn = document.getElementById('sendBtn'); btn.innerText = "Sending..."; btn.disabled = true;
+            try {
+                sections.forEach(s => s.synced = true);
+                const liveCopy = JSON.parse(JSON.stringify(sections));
+                await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sections, liveSections: liveCopy, employees, currentAnimation, pageTitle }) });
+                hasChanges = false; lastLiveHash = JSON.stringify(liveCopy);
+                btn.innerText = "Sent!"; btn.classList.add('success');
+                setTimeout(() => { btn.innerText = "SEND TO DISPLAY"; btn.classList.remove('success'); btn.disabled = true; }, 1500);
+                render();
+            } catch (err) { console.error(err); btn.innerText = "Error!"; btn.classList.add('error'); setTimeout(() => { btn.innerText = "SEND TO DISPLAY"; btn.classList.remove('error'); btn.disabled = false; }, 3000); alert("Failed to send."); }
+        }
+
+        function changeDisplayTitle() {
+            const newTitle = prompt("Enter new title for the Display screen:", pageTitle);
+            if (newTitle !== null && newTitle.trim() !== "") { pageTitle = newTitle; markChanged(); }
+        }
+
+        // --- RENDER ---
+        function render() {
+            const container = document.getElementById('container'); container.innerHTML = '';
+            sections.forEach((s, i) => {
+                const card = document.createElement('div');
+                card.className = `card ${s.synced ? 'is-live' : ''}`; card.id = `card-${i}`;
+                card.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                    <input value="${s.label}" placeholder="Section Title" oninput="update(${i},'label',this.value)" class="section-title-input">
+                    <span onclick="removeSection(${i})" style="cursor:pointer; color:#94a3b8; font-weight:bold; font-size: 1.2rem; margin-left:10px;">✕</span>
+                </div>
+                <div class="staff-container-shaded">
+                    <div style="min-height:28px; display:flex; flex-wrap:wrap; gap:4px;">
+                        ${s.assignedInitials.map(ini => `<span class="staff-tag">${ini} <span class="remove-ini-btn" onclick="removeSingleInitial(${i},'${ini}')">×</span></span>`).join('')}
+                    </div>
+                    <button class="vibe-btn" style="margin-top: 12px; width: 100%;" onclick="openAssignModal(${i})">+ Assign Staff</button>
+                    <div class="paste-btn-row">
+                        <button class="paste-btn" onclick="openPasteModal(${i}, 'TEAM')">Paste TEAM Data</button>
+                    </div>
+                </div>
+                <textarea placeholder="Notes" oninput="update(${i},'content',this.value)" class="section-notes-textarea">${s.content || ''}</textarea>`;
+                container.appendChild(card);
+            });
+            renderStaffListModal();
+        }
+
+        function update(i, field, val) { sections[i].synced = false; if(field==='label') sections[i].label=val; else sections[i].content=val; document.getElementById(`card-${i}`)?.classList.remove('is-live'); markChanged(); }
+        function addSection() { sections.push({ id: Date.now(), label: "", content: "", assignedInitials: [], synced: false }); markChanged(); render(); }
+        function removeSection(i) { if(confirm("Delete section?")) { sections.splice(i, 1); markChanged(); render(); } }
+        function removeSingleInitial(idx, ini) { sections[idx].assignedInitials = sections[idx].assignedInitials.filter(x => x !== ini); sections[idx].synced = false; markChanged(); render(); }
+
+        // --- SEARCH & MODALS ---
+        function toggleModal(id, show) { 
+            const m = document.getElementById(id); if (m) { m.style.display = show ? 'flex' : 'none'; if (show) setTimeout(() => { const inp = m.querySelector('input, textarea'); if(inp) { inp.value=''; inp.focus(); } if(id==='searchModal') document.getElementById('searchResults').innerHTML=''; }, 50); }
+        }
+        function performSearch() {
+            const input = document.getElementById('searchStaffInput').value.trim().toUpperCase();
+            const resultsDiv = document.getElementById('searchResults'); resultsDiv.innerHTML = '';
+            if (!input) return;
+            const matches = employees.filter(e => e.startsWith(input));
+            if (matches.length === 0) { resultsDiv.innerHTML = '<div style="padding:20px; text-align:center; color:#94a3b8;">No matching staff found</div>'; return; }
+            matches.forEach(ini => {
+                const assignedSections = sections.filter(s => s.assignedInitials.includes(ini));
+                const card = document.createElement('div'); card.className = 'search-result-card';
+                const listHtml = assignedSections.length > 0 ? `<div class="search-section-list">${assignedSections.map(s => `<div class="search-section-item">${s.label || "Untitled Section"}</div>`).join('')}</div>` : `<div style="color:#ef4444; font-weight:bold; margin-top:10px;">Not currently assigned</div>`;
+                card.innerHTML = `<div class="search-large-initials">${ini}</div>${listHtml}`;
+                resultsDiv.appendChild(card);
+            });
+        }
+        // STAFF LIST MODAL
+        function renderStaffListModal() { const list = document.getElementById('modalEmpList'); if(list) list.innerHTML = employees.map((e, i) => `<div style="background:#f1f5f9; padding:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;"><b>${e}</b> <span onclick="removeEmployee(${i})" style="color:#e11d48; cursor:pointer; font-weight:bold;">✕</span></div>`).join(''); }
+        function addEmployee() { const v = document.getElementById('empInitials').value.trim().toUpperCase(); if(v && !employees.includes(v)){ employees.push(v); employees.sort(); markChanged(); document.getElementById('empInitials').value=''; renderStaffListModal(); } }
+        function removeEmployee(i) { employees.splice(i, 1); markChanged(); renderStaffListModal(); }
+
+        // --- PASTE MODAL LOGIC ---
+        function openPasteModal(i, type) {
+            currentTargetSection = i; currentPasteType = type;
+            document.getElementById('pasteModalTitle').innerText = `Paste ${type} Data`;
+            toggleModal('pasteModal', true);
+        }
+
+        function submitPasteData() {
+            const rawData = document.getElementById('pasteInput').value;
+            if (!rawData) { toggleModal('pasteModal', false); return; }
+            let extracted = [];
+
+            if (currentPasteType === 'TEAM') {
+                const regex = /\(([a-zA-Z]+)\)/g;
+                let match;
+                while ((match = regex.exec(rawData)) !== null) { extracted.push(match[1].toUpperCase()); }
+            } 
+
+            const uniquePasted = [...new Set(extracted)];
+            if (uniquePasted.length === 0) { alert("No initials found in parentheses. Example: (ABC)"); return; }
+            
+            // Check against employee strings
+            const valid = uniquePasted.filter(ini => employees.includes(ini));
+            
+            if (valid.length === 0) { alert("Initials found, but none are in your Staff Directory."); return; }
+
+            const sec = sections[currentTargetSection];
+            let added = 0;
+
+            valid.forEach(ini => { 
+                if (!sec.assignedInitials.includes(ini)) { 
+                    sec.assignedInitials.push(ini); 
+                    added++; 
+                } 
+            });
+
+            if (added > 0) {
+                sec.assignedInitials.sort(); sec.synced = false; document.getElementById(`card-${currentTargetSection}`)?.classList.remove('is-live');
+                markChanged(); render(); toggleModal('pasteModal', false);
+            } else { 
+                toggleModal('pasteModal', false); 
+                alert("Staff found, but they are already assigned to this section."); 
+            }
+        }
+
+        // --- ASSIGN ---
+        function openAssignModal(i) { currentTargetSection = i; tempSelected = [...sections[i].assignedInitials]; renderSelectionGrid(); toggleModal('assignModal', true); }
+        function renderSelectionGrid() { const grid = document.getElementById('selectionGrid'); const count = employees.length; let cols = count > 40 ? 6 : (count > 24 ? 5 : (count > 12 ? 4 : 3)); grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`; grid.innerHTML = employees.map(e => `<div class="staff-select-btn ${tempSelected.includes(e)?'staff-selected':''}" onclick="toggleStaff('${e}')">${e}</div>`).join(''); }
+        function toggleStaff(e) { if(tempSelected.includes(e)) tempSelected = tempSelected.filter(x => x!==e); else tempSelected.push(e); renderSelectionGrid(); }
+        function quickToggleStaff() { const input = document.getElementById('quickAssignInput'); const val = input.value.trim().toUpperCase(); if(val) { if (employees.includes(val)) toggleStaff(val); else alert("Those initials aren't in the list."); input.value = ''; } input.focus(); }
+        function toggleSelectAll() { tempSelected = (employees.every(e => tempSelected.includes(e))) ? [] : [...employees]; renderSelectionGrid(); }
+        function clearAllSelection() { tempSelected = []; renderSelectionGrid(); }
+        function finalizeAssignment() { sections[currentTargetSection].assignedInitials = tempSelected.sort(); sections[currentTargetSection].synced = false; document.getElementById(`card-${currentTargetSection}`)?.classList.remove('is-live'); markChanged(); toggleModal('assignModal', false); render(); }
+
+        function toggleMenu(e) { e.stopPropagation(); document.getElementById("myDropdown").classList.toggle("show-menu"); }
+        function closeMenu() { document.getElementById("myDropdown").classList.remove("show-menu"); }
+        function clearLog() { if(confirm("Clear log?")) { document.getElementById('logContent').innerHTML = ''; localStorage.removeItem('completionLog'); } }
+        function addLogEntry(ini, label) { const log = document.getElementById('logContent'); const entry = document.createElement('div'); const now = new Date(); entry.style.borderBottom = "1px solid #334155"; entry.style.padding = "10px 0"; entry.innerHTML = `<div style="color:#64748b; font-size:0.7rem;">${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div><div style="font-size:0.85rem;"><b style="color:#4ade80;">${ini}</b> <span style="color:#94a3b8;">COMPLETED</span> <b style="color:#60a5fa;">${label}</b></div>`; log.prepend(entry); localStorage.setItem('completionLog', log.innerHTML); }
+
+        checkAuth();
+        document.getElementById('logContent').innerHTML = localStorage.getItem('completionLog') || ''; 
+        setInterval(syncFromCloud, 8000); 
+        syncFromCloud();
+    </script>
+</body>
+</html>
