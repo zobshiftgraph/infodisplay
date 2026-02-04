@@ -5,19 +5,30 @@
     <title>Information Display</title>
     <style>
         html, body { margin:0; padding:0; height:100vh; width:100vw; background:#000; color:white; font-family:sans-serif; overflow:hidden; display:flex; flex-direction:column; }
+        
+        /* HEADER */
         .main-header { display: grid; grid-template-columns: 180px 1fr 180px; align-items: center; padding: 1vh 1.5vh; color:#28a745; background:#111; border-bottom: 2px solid #222; z-index: 10; flex-shrink: 0; }
         .header-title { font-size:2.8vh; font-weight:900; text-align: center; grid-column: 2; text-transform: uppercase; }
+        
+        /* STATUS BAR (Hidden by default unless error) */
+        #statusBar { background: #333; color: #fff; padding: 5px; font-size: 12px; text-align: center; font-family: monospace; border-bottom: 1px solid #555; display: none; }
+        
+        /* BUTTONS */
         .locate-btn { background: #222; color: #60a5fa; border: 0.15vh solid #444; padding: 1.5vh 2.5vh; border-radius: 0.8vh; font-weight: 900; font-size: 2.2vh; cursor: pointer; justify-self: start; }
         .undo-btn { grid-column: 3; background: #222; color: #60a5fa; border: 0.15vh solid #444; padding: 1.5vh 2.5vh; border-radius: 0.8vh; font-weight: 900; font-size: 2.2vh; cursor: pointer; opacity: 0.3; pointer-events: none; justify-self: end; display: flex; align-items: center; gap: 0.8vh; transition: all 0.2s; }
         .undo-active { opacity: 1 !important; pointer-events: auto !important; background: #333 !important; border-color: #60a5fa !important; }
         
+        /* GRID */
         #displayGrid { display:grid; gap:1.5vh; flex-grow:1; padding:1.5vh; box-sizing:border-box; grid-auto-rows: 1fr; overflow: hidden; position: relative; }
         .section { border:0.3vh solid #555; padding:1.5vh; background:#111; border-radius:1vh; display:flex; flex-direction:column; overflow: hidden; box-sizing: border-box; justify-content: space-between; position: relative; z-index: 1; }
+        
+        /* CONTENT */
         .label { font-weight: 900; color: #ffffff; cursor: pointer; white-space: nowrap; overflow: hidden; text-align: center; width: 100%; text-shadow: -1px -1px 0 #007bff, 1px -1px 0 #007bff, -1px 1px 0 #007bff, 1px 1px 0 #007bff, 0 0 2vh #007bff; flex-shrink: 0; }
         .content-text { color:#ccc; font-weight: 600; text-align: center; font-size: 2.5vh; margin-bottom: 1vh; flex-shrink: 0; }
         .initials-footer { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: 2vh; flex-grow: 1; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box; padding: 1vh; }
         .clickable-ini { cursor: pointer; font-weight: 800; color: #007bff; display: flex; align-items: center; justify-content: center; white-space: nowrap; }
         
+        /* STATES */
         .fullscreen-focus { position: fixed !important; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; background: #000; padding: 6vh; box-sizing: border-box; }
         .fullscreen-focus .initials-footer { gap: 12vh !important; } 
         .close-x { display: none; position: absolute; top: 2vh; right: 4vh; font-size: 8vh; color: #ff4d4d; cursor: pointer; font-weight: bold; z-index: 10000; }
@@ -27,6 +38,7 @@
         .animate-stamp { animation: stampSlam 0.25s forwards; transform-origin: center; }
         @keyframes stampSlam { 0% { transform: scale(5) rotate(-30deg); opacity: 0; } 100% { transform: scale(1) rotate(-12deg); opacity: 0.8; } }
 
+        /* ANIMATIONS */
         .ani-sparkle { animation: sparkleShine 0.4s ease-out forwards; color: #fff !important; }
         @keyframes sparkleShine { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); text-shadow: 0 0 20px #fff; opacity: 1; } 100% { transform: scale(1.2); opacity: 0; } }
         .ani-zoom { animation: zoomFade 0.3s ease-in forwards; }
@@ -41,6 +53,7 @@
         @keyframes aniSlide { 100% { transform: translateX(120%); opacity: 0; } }
         .particle, .confetti { position:fixed; width:10px; height:10px; pointer-events:none; z-index:20000; border-radius: 50%; }
 
+        /* MODALS */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 20000; justify-content: center; align-items: center; }
         .modal-content { background: #111; border: 2px solid #444; padding: 3vh; border-radius: 2vh; width: fit-content; max-width: 90vw; max-height: 85vh; overflow-y: auto; text-align: center; }
         .keyboard-row { display: flex; justify-content: center; gap: 1vh; margin-bottom: 1vh; }
@@ -48,6 +61,7 @@
     </style>
 </head>
 <body>
+    <div id="statusBar"></div>
     <div class="main-header">
         <button class="locate-btn" onclick="openLocateModal()">FIND ME</button>
         <div class="header-title">TOUCH INITIALS WHEN COMPLETE</div>
@@ -62,10 +76,24 @@
         </div>
     </div>
     <script>
-        const API_URL = "https://staff-api.zobinfodisp.workers.dev/"; 
+        // ========================================================
+        // ⚠️ API URL - MUST MATCH CONTROLLER ⚠️
+        // ========================================================
+        const API_URL = "https://zob-display-api.zobinfodisp.workers.dev/"; 
+        // ========================================================
+
         let lastHash = "", currentAnim = 'Particles', actionHistory = [];
         let stampedSections = new Set(), currentActiveInitials = [];
         let pendingChanges = []; let saveTimer = null;
+        let cachedSections = []; // Local copy for instant updates
+
+        function setStatus(msg, color) {
+            const bar = document.getElementById('statusBar');
+            if (!msg) { bar.style.display = "none"; return; }
+            bar.style.display = "block";
+            bar.innerText = "STATUS: " + msg;
+            bar.style.color = color || "#fff";
+        }
 
         function scaleText() {
             const sections = document.querySelectorAll('.section');
@@ -90,23 +118,39 @@
         }
 
         async function updateUI() {
-            if (saveTimer) return; 
+            if (saveTimer) return; // Don't fetch while saving or we might overwrite local changes
             try {
-                const res = await fetch(API_URL); if (!res.ok) throw new Error("Fetch failed");
+                const res = await fetch(API_URL); 
+                if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+                
                 const data = await res.json();
                 const hash = JSON.stringify(data.liveSections) + (data.pageTitle || "");
-                if (hash === lastHash) return; lastHash = hash;
                 
-                // UPDATE HEADER TITLE
+                if (hash === lastHash) return; 
+                lastHash = hash;
+                
+                // Update local cache
+                cachedSections = data.liveSections || [];
+                
+                // Update Page Title
                 document.querySelector('.header-title').innerText = data.pageTitle || "TOUCH INITIALS WHEN COMPLETE";
                 
                 currentAnim = data.currentAnimation || 'Particles';
-                renderGrid(data.liveSections);
-            } catch (e) { console.log("Waiting for connection..."); }
+                renderGrid(cachedSections);
+                setStatus(""); // Clear status on success
+            } catch (e) { 
+                console.error(e);
+                setStatus("Connection Failed: " + e.message, "#ef4444");
+            }
         }
 
         function renderGrid(sections) {
             const grid = document.getElementById('displayGrid');
+            if (!sections || sections.length === 0) {
+                grid.innerHTML = "<div style='text-align:center; padding:50px; color:#666;'>Waiting for Controller data...</div>";
+                return;
+            }
+
             const live = (sections || []).filter(s => s.synced);
             let allInis = []; live.forEach(s => allInis.push(...s.assignedInitials)); currentActiveInitials = [...new Set(allInis)].sort();
             
@@ -130,38 +174,84 @@
         }
 
         function handleTouch(el, sid, ini, e) {
-            actionHistory.push({ sid, ini }); if (actionHistory.length > 10) actionHistory.shift(); updateUndoButton();
+            // 1. Optimistic UI (Hide instantly)
+            el.style.visibility = "hidden";
+            
+            // 2. Track Action
+            actionHistory.push({ sid, ini }); 
+            if (actionHistory.length > 10) actionHistory.shift(); 
+            updateUndoButton();
+            
+            // 3. Play Animation
             const animKey = getAnimKey(currentAnim);
-            if (animKey === 'particles' || animKey === 'confetti') { createParticles(e.clientX, e.clientY, animKey); el.style.visibility = "hidden"; } 
-            else if (animKey === 'pop') el.classList.add('ani-pop');
-            else if (animKey === 'slide') el.classList.add('ani-slide');
-            else if (animKey === 'glitch') el.classList.add('ani-glitch');
-            else if (animKey === 'ghost') el.classList.add('ani-ghost');
-            else if (animKey === 'sparkle') el.classList.add('ani-sparkle');
-            else if (animKey === 'zoom') el.classList.add('ani-zoom');
-            else el.style.opacity = "0";
+            if (animKey === 'particles' || animKey === 'confetti') { createParticles(e.clientX, e.clientY, animKey); } 
+            else if (animKey !== 'none') { el.style.visibility = "visible"; el.classList.add('ani-' + animKey); }
+
+            // 4. Queue Save (Debounced)
             pendingChanges.push({ sid, ini, type: 'remove' });
-            if (saveTimer) clearTimeout(saveTimer); saveTimer = setTimeout(flushChanges, 2000); 
+            
+            if (saveTimer) clearTimeout(saveTimer);
+            saveTimer = setTimeout(flushChanges, 2000); 
+        }
+
+        function undoLastAction() { 
+            if (actionHistory.length === 0) return; 
+            const { sid, ini } = actionHistory.pop(); 
+            
+            // 1. Optimistic Update (Show instantly)
+            const sec = cachedSections.find(s => s.id === sid);
+            if (sec) {
+                if (!sec.assignedInitials.includes(ini)) {
+                    sec.assignedInitials.push(ini);
+                    sec.assignedInitials.sort();
+                }
+                renderGrid(cachedSections); // Re-draw immediately
+            }
+
+            // 2. Queue Save
+            stampedSections.delete(sid); 
+            pendingChanges.push({ sid, ini, type: 'add' });
+            
+            if (saveTimer) clearTimeout(saveTimer);
+            saveTimer = setTimeout(flushChanges, 2000);
+            updateUndoButton(); 
         }
 
         async function flushChanges() {
             if (pendingChanges.length === 0) return;
+            // setStatus("Saving changes...", "#facc15"); // Optional visual feedback
             try {
                 const res = await fetch(API_URL); const data = await res.json();
+                
                 pendingChanges.forEach(change => {
                     const sec = data.liveSections.find(x => x.id == change.sid);
                     if(sec) {
-                        if (change.type === 'remove') sec.assignedInitials = sec.assignedInitials.filter(i => i !== change.ini);
-                        else if (change.type === 'add') { sec.assignedInitials.push(change.ini); sec.assignedInitials.sort(); }
+                        if (change.type === 'remove') {
+                            sec.assignedInitials = sec.assignedInitials.filter(i => i !== change.ini);
+                        } else if (change.type === 'add') {
+                            // Avoid duplicates
+                            if (!sec.assignedInitials.includes(change.ini)) {
+                                sec.assignedInitials.push(change.ini);
+                                sec.assignedInitials.sort();
+                            }
+                        }
                     }
                 });
+
                 await fetch(API_URL, { method: "POST", body: JSON.stringify(data) });
-                pendingChanges = []; saveTimer = null; updateUI(); 
-            } catch (err) { console.error("Save failed", err); saveTimer = null; }
+                
+                pendingChanges = []; 
+                saveTimer = null; 
+                setStatus("");
+                updateUI(); // Fetch fresh state to ensure perfect sync
+            } catch (err) { 
+                console.error("Save failed", err); 
+                setStatus("Sync Retrying...", "#ef4444");
+                saveTimer = null; 
+            }
         }
 
         function updateUndoButton() { const btn = document.getElementById('undoBtn'); if (actionHistory.length > 0) { btn.innerText = `↺ ${actionHistory[actionHistory.length - 1].ini}`; btn.classList.add('undo-active'); } else { btn.innerText = "↺"; btn.classList.remove('undo-active'); } }
-        function undoLastAction() { if (actionHistory.length === 0) return; const { sid, ini } = actionHistory.pop(); stampedSections.delete(sid); pendingChanges.push({ sid, ini, type: 'add' }); if (saveTimer) clearTimeout(saveTimer); saveTimer = setTimeout(flushChanges, 2000); updateUndoButton(); }
         function createParticles(x, y, type) { const isConfetti = type === 'confetti'; for(let i=0; i<35; i++) { const p = document.createElement('div'); p.className = isConfetti ? 'confetti' : 'particle'; p.style.backgroundColor = isConfetti ? `hsl(${Math.random()*360},100%,50%)` : '#007bff'; p.style.left = x + 'px'; p.style.top = y + 'px'; document.body.appendChild(p); const angle = Math.random() * Math.PI * 2, velocity = 5 + Math.random() * 10; let posX = x, posY = y, vx = Math.cos(angle) * velocity, vy = Math.sin(angle) * velocity, opacity = 1; const animate = () => { posX += vx; posY += vy; vy += 0.25; opacity -= 0.02; p.style.left = posX + 'px'; p.style.top = posY + 'px'; p.style.opacity = opacity; if(opacity > 0) requestAnimationFrame(animate); else p.remove(); }; requestAnimationFrame(animate); } }
         function getAnimKey(str) { const s = str ? str.toLowerCase() : 'none'; if (s.includes('pop')) return 'pop'; if (s.includes('slide')) return 'slide'; if (s.includes('glitch')) return 'glitch'; if (s.includes('ghost')) return 'ghost'; if (s.includes('sparkle')) return 'sparkle'; if (s.includes('zoom')) return 'zoom'; if (s.includes('particle')) return 'particles'; if (s.includes('confetti')) return 'confetti'; return 'none'; }
         
@@ -170,7 +260,6 @@
         function closeLocateModal() { document.getElementById('locateModal').style.display = 'none'; }
         function highlightInitials(ini) { 
             closeLocateModal(); 
-            // UPDATED: Use querySelectorAll to find ALL instances
             const elements = document.querySelectorAll(`[data-ini="${ini}"]`); 
             elements.forEach(el => {
                 el.style.color = "#fdfd96"; 

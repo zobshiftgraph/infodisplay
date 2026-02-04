@@ -53,10 +53,16 @@
         /* --- MODALS --- */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.8); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
         .modal-content { background: white; padding: 30px; border-radius: 20px; width: 90vw; max-width: 850px; max-height: 85vh; display: flex; flex-direction: column; box-sizing: border-box; }
+        
         #modalEmpList { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; overflow-y: auto; flex-grow: 1; padding-right: 5px; margin-bottom: 15px; }
         #selectionGrid { display: grid; gap: 8px; overflow-y: auto; flex-grow: 1; margin-bottom: 20px; }
         .staff-select-btn { padding: 12px 5px; border-radius: 8px; border: 1px solid #e2e8f0; font-weight: bold; cursor: pointer; text-align: center; background: #fff; }
         .staff-selected { background: #6b46c1 !important; color: white !important; }
+
+        /* Animation Grid */
+        #animGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; }
+        .anim-btn { padding: 15px; border: 2px solid #e2e8f0; border-radius: 10px; text-align: center; cursor: pointer; font-weight: bold; color: #475569; background: white; }
+        .anim-active { border-color: #6b46c1; background: #f3e8ff; color: #6b46c1; }
 
         /* --- PASTE BUTTONS --- */
         .paste-btn-row { display: flex; gap: 8px; margin-top: 10px; }
@@ -97,6 +103,7 @@
                         <button class="dropdown-item" onclick="addSection()">Add New Section</button>
                         <button class="dropdown-item" onclick="toggleModal('empModal', true)">Manage Staff List</button>
                         <div style="height:1px; background:#eee; margin:5px 0;"></div>
+                        <button class="dropdown-item" onclick="toggleModal('animModal', true)">Animation Effects</button>
                         <button class="dropdown-item" onclick="changeDisplayTitle()">Change Header Title</button>
                         <div style="height:1px; background:#eee; margin:5px 0;"></div>
                         <button class="dropdown-item" onclick="logout()" style="color:#e11d48;">Logout</button>
@@ -116,6 +123,15 @@
             <button onclick="clearLog()" style="background:transparent; border:1px solid #334155; color:#64748b; padding:4px 10px; border-radius:6px; cursor:pointer; font-size: 0.75rem;">Clear</button>
         </div>
         <div id="logContent" style="padding: 15px; overflow-y: auto; flex-grow: 1; font-family: 'Courier New', monospace;"></div>
+    </div>
+
+    <div id="animModal" class="modal-overlay" onclick="toggleModal('animModal', false)">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 400px;">
+            <h3 style="margin:0 0 20px 0;">Select Animation</h3>
+            <div id="animGrid">
+                </div>
+            <button class="vibe-btn" onclick="toggleModal('animModal', false)" style="padding:12px; margin-top:10px; width:100%;">Close</button>
+        </div>
     </div>
 
     <div id="searchModal" class="modal-overlay" onclick="toggleModal('searchModal', false)">
@@ -176,12 +192,14 @@
     </div>
 
     <script>
-        const API_URL = "https://staff-api.zobinfodisp.workers.dev/"; 
-        const PIN_HASH = "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f"; // 5678
+        const API_URL = "https://zob-display-api.zobinfodisp.workers.dev/"; 
+        const PIN_HASH = "2926a2731f4b312c08982cacf8061eb14bf65c1a87cc5d70e864e079c6220731"; // Your new hash
         
         let sections = [], employees = [], currentAnimation = 'particles', pageTitle = "TOUCH INITIALS WHEN COMPLETE";
-        let currentTargetSection = null, tempSelected = [], lastLiveHash = "", hasChanges = false, failCount = 0;
+        let currentTargetSection = null, tempSelected = [], lastLiveHash = "", hasChanges = false;
         let currentPasteType = ""; 
+
+        const ANIM_OPTIONS = ['Particles', 'Confetti', 'Pop', 'Slide', 'Glitch', 'Ghost', 'Sparkle', 'Zoom'];
 
         // --- AUTH ---
         async function verifyPIN() {
@@ -194,10 +212,10 @@
                 const hashBuffer = await crypto.subtle.digest('SHA-256', data);
                 const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
                 if (hashHex.trim().toLowerCase() === PIN_HASH.trim().toLowerCase()) loginSuccess();
-                else { failCount++; if(failCount>=3 && confirm(`Debug: ${hashHex}. Bypass?`)) loginSuccess(); else alert("Incorrect PIN"); document.getElementById('pinInput').value=''; }
+                else { alert("Incorrect PIN"); document.getElementById('pinInput').value=''; }
             } catch (e) { alert("Security Error"); }
         }
-        function loginSuccess() { failCount = 0; document.getElementById('loginOverlay').style.display = 'none'; if(document.getElementById('stayLoggedIn').checked) localStorage.setItem('persistentAuth', 'true'); else sessionStorage.setItem('isAuthorized', 'true'); syncFromCloud(); }
+        function loginSuccess() { document.getElementById('loginOverlay').style.display = 'none'; if(document.getElementById('stayLoggedIn').checked) localStorage.setItem('persistentAuth', 'true'); else sessionStorage.setItem('isAuthorized', 'true'); syncFromCloud(); }
         function checkAuth() { if (sessionStorage.getItem('isAuthorized') === 'true' || localStorage.getItem('persistentAuth') === 'true') document.getElementById('loginOverlay').style.display = 'none'; else setTimeout(() => document.getElementById('pinInput').focus(), 100); }
         function logout() { if(confirm("Logout?")) { localStorage.removeItem('persistentAuth'); sessionStorage.removeItem('isAuthorized'); location.reload(); } }
 
@@ -220,23 +238,16 @@
                                 const cloudInis = ls.assignedInitials || [];
                                 const localInis = draft.assignedInitials || [];
                                 
-                                // SMART SYNC LOGIC
                                 if (JSON.stringify(localInis) !== JSON.stringify(cloudInis)) {
-                                    // Log completion
                                     localInis.filter(ini => !cloudInis.includes(ini)).forEach(ini => addLogEntry(ini, ls.label));
-                                    
-                                    // Update local data
                                     draft.assignedInitials = cloudInis;
-                                    
-                                    // Update DOM specifically
                                     const card = document.getElementById(`card-${draftIndex}`);
                                     if (card) {
                                         const container = card.querySelector('.staff-container-shaded > div');
                                         if (container) {
                                             container.innerHTML = cloudInis.map(ini => `<span class="staff-tag">${ini} <span class="remove-ini-btn" onclick="removeSingleInitial(${draftIndex},'${ini}')">×</span></span>`).join('');
-                                            // FLASH ANIMATION TO SHOW UPDATE
                                             card.querySelector('.staff-container-shaded').classList.remove('flash-update');
-                                            void card.offsetWidth; // trigger reflow
+                                            void card.offsetWidth;
                                             card.querySelector('.staff-container-shaded').classList.add('flash-update');
                                         }
                                     }
@@ -251,14 +262,11 @@
                          render();
                     }
                     
-                    // --- REVERT MIGRATION SAFEGUARD ---
                     let rawEmps = data.employees || [];
                     if (rawEmps.length > 0 && typeof rawEmps[0] === 'object') {
                         employees = rawEmps.map(e => e.initials).sort();
                         markChanged(); 
-                    } else {
-                        employees = rawEmps;
-                    }
+                    } else { employees = rawEmps; }
 
                     currentAnimation = data.currentAnimation || 'particles';
                     lastLiveHash = newLiveHash;
@@ -318,7 +326,23 @@
         // --- SEARCH & MODALS ---
         function toggleModal(id, show) { 
             const m = document.getElementById(id); if (m) { m.style.display = show ? 'flex' : 'none'; if (show) setTimeout(() => { const inp = m.querySelector('input, textarea'); if(inp) { inp.value=''; inp.focus(); } if(id==='searchModal') document.getElementById('searchResults').innerHTML=''; }, 50); }
+            if (show && id === 'animModal') renderAnimModal();
         }
+        
+        function renderAnimModal() {
+            const grid = document.getElementById('animGrid');
+            grid.innerHTML = ANIM_OPTIONS.map(anim => {
+                const isActive = (currentAnimation || 'particles').toLowerCase() === anim.toLowerCase();
+                return `<div class="anim-btn ${isActive ? 'anim-active' : ''}" onclick="selectAnimation('${anim}')">${anim}</div>`;
+            }).join('');
+        }
+
+        function selectAnimation(anim) {
+            currentAnimation = anim.toLowerCase();
+            markChanged();
+            toggleModal('animModal', false);
+        }
+
         function performSearch() {
             const input = document.getElementById('searchStaffInput').value.trim().toUpperCase();
             const resultsDiv = document.getElementById('searchResults'); resultsDiv.innerHTML = '';
@@ -359,9 +383,7 @@
             const uniquePasted = [...new Set(extracted)];
             if (uniquePasted.length === 0) { alert("No initials found in parentheses. Example: (ABC)"); return; }
             
-            // Check against employee strings
             const valid = uniquePasted.filter(ini => employees.includes(ini));
-            
             if (valid.length === 0) { alert("Initials found, but none are in your Staff Directory."); return; }
 
             const sec = sections[currentTargetSection];
